@@ -9,6 +9,7 @@ except ImportError:
 
 from time import strftime, localtime
 import ntpath
+import hashlib
 
 class Directory:
     def __init__(self, path):
@@ -33,19 +34,8 @@ class Directory:
     def __getMTimeForFile(self, file):
         return os.stat(os.path.join(self.path, file)).st_mtime
 
-
-    ## This function determines if there have been changes to the directory by comparing the mtime
-    #  for the finger print file against the mtime of the directory
-    def dirHasChanged(self):
-        # finger print file must exist
-        self.logger.debug("fingerprint DB file modified at {}".
-                          format(strftime("%Y-%m-%d %H:%M:%S", localtime(self.fpDBMTime))))
-        self.logger.debug("{} was modified at {}".
-                          format(self.path, strftime("%Y-%m-%d %H:%M:%S", localtime(self.dirMTime))))
-
-        return self.fpDBMTime < self.dirMTime
-
-    def lsDir(self, checkForModifiedFiles=False):
+    ## This function creates Directory object for each subdirectory and caches the modify times for all files
+    def lsDir(self):
         headerPrinted = False
 
         for element in scandir(self.path):
@@ -62,7 +52,7 @@ class Directory:
             elif element.is_file():
                 self.files[element.name] = element.stat().st_mtime
 
-    def fingerPrint(self, checkForModifiedFiles=False):
+    def fingerPrint(self):
         self.logger.debug("fingerprinting {}...".format(self.path))
 
         # figure out if all the files need to be fingerprinted
@@ -71,12 +61,7 @@ class Directory:
             fpAllFiles = True
 
         # finger print sub directories first
-        [subdir.fingerPrint(checkForModifiedFiles) for subdir in self.subDirs]
-
-        if not checkForModifiedFiles and not fpAllFiles and not self.dirHasChanged():
-            # there is nothing to do here
-            self.logger.info("no files to fingerprint in '{}'".format(self.path))
-            return
+        [subdir.fingerPrint() for subdir in self.subDirs]
 
         # list files that need to be finger printed
         files = []
@@ -84,6 +69,10 @@ class Directory:
             if fpAllFiles or mTime > self.fpDBMTime:
                 files.append(file)
 
-        self.logger.info("files that need to be fingerprinted in '{}': {}".format(self.path, ', '.join(files)))
+        if not files:
+            self.logger.info("no files to fingerprint in '{}'".format(self.path))
+        else:
+            self.logger.info("files that need to be fingerprinted in '{}': {}".format(self.path, ', '.join(files)))
 
+        [self.logger.debug(hashlib.md5(os.path.join(self.path, file)).hexdigest()) for file in files]
         # TODO - need to handle deleted files
