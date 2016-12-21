@@ -2,6 +2,11 @@
 
 import os.path
 import Logger
+try:
+    from os import scandir
+except ImportError:
+    from scandir import scandir
+
 from time import strftime, localtime
 import ntpath
 
@@ -15,7 +20,9 @@ class Directory:
         self.logger = Logger.Logger(self.logFile, ntpath.basename(self.path))
         self.dirMTime = os.stat(self.path).st_mtime
         self.fpDBMTime = self.__getfpDBMTime()
-        self.initSubDirs()
+        self.subDirs = []
+        self.files = dict()
+        self.lsDir()
 
     def __getfpDBMTime(self):
         if not os.path.isfile(self.fpDBFile):
@@ -38,18 +45,22 @@ class Directory:
 
         return self.fpDBMTime < self.dirMTime
 
-    def initSubDirs(self, checkForModifiedFiles=False):
-        self.subDirs = []
+    def lsDir(self, checkForModifiedFiles=False):
         headerPrinted = False
-        for subdir in os.listdir(self.path):
-            if subdir != ".dp" and os.path.isdir(os.path.join(self.path, subdir)):
-                p = os.path.join(self.path, subdir)
+
+        for element in scandir(self.path):
+            if element.name == ".dp":
+                continue
+            if element.is_dir():
+                p = os.path.join(self.path, element.name)
                 if not headerPrinted:
                     self.logger.debug("list of sub directories for {}:".format(self.path))
                     headerPrinted = True 
 
                 self.logger.debug(p)
                 self.subDirs.append(Directory(p))
+            elif element.is_file():
+                self.files[element.name] = element.stat().st_mtime
 
     def fingerPrint(self, checkForModifiedFiles=False):
         self.logger.debug("fingerprinting {}...".format(self.path))
@@ -69,9 +80,9 @@ class Directory:
 
         # list files that need to be finger printed
         files = []
-        [files.append(f) 
-         for f in os.listdir(self.path) 
-         if os.path.isfile(os.path.join(self.path, f)) and (fpAllFiles or self.__getMTimeForFile(f) > self.fpDBMTime)]
+        for file, mTime in self.files.iteritems():
+            if fpAllFiles or mTime > self.fpDBMTime:
+                files.append(file)
 
         self.logger.info("files that need to be fingerprinted in '{}': {}".format(self.path, ', '.join(files)))
 
