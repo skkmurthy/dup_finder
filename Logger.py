@@ -3,7 +3,7 @@
 from enum import IntEnum
 import sys
 import datetime
-from time import gmtime, strftime
+from time import gmtime, strftime, localtime
 from inspect import currentframe, getframeinfo
 import ntpath
 
@@ -100,17 +100,17 @@ class Logger:
         return self.logFh
 
     def __logMsg(self, msg, level):
-        # capture caller info
-        frameinfo = getframeinfo(currentframe().f_back.f_back)
-
         if level < Logger.logLevel:
             return
+
+        # capture caller info
+        frameinfo = getframeinfo(currentframe().f_back.f_back)
 
         if None != self.logPrefix:
             self.__getLogFh().write(self.logPrefix + " -- ")
 
         self.__getLogFh().write("{} - [{}] - [{}:{}] {}\n".
-                                format(datetime.datetime.now(),
+                                format(strftime("%Y-%m-%d %H:%M:%S", localtime()),
                                        Logger.Level.toStr(level),
                                        ntpath.basename(frameinfo.filename),
                                        frameinfo.lineno, msg))
