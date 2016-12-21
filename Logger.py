@@ -14,9 +14,9 @@ import ntpath
 #          In this mode, each log message is prefixed with the log prefix.
 #  - 4 logging levels -- debug, info, warning and error -- with corresponding logging functions are
 #    available.
-#  - Log message format:
-#    File mode:   <Time> - [<Log Level>] - [<File>:<Line>] <message>
-#    Stdout mode: <Log prefix> -- <Time> - [<Log Level>] - [<File>:<Line>] <message>
+#  - Log message format:<br/>
+#    File mode:   <Time> - [<Log Level>] - [<File>:<Line>] <message><br/>
+#    Stdout mode: <Log prefix> -- <Time> - [<Log Level>] - [<File>:<Line>] <message><br/>
 class Logger:
     ## Logging levels
     class Level(IntEnum):
@@ -69,22 +69,22 @@ class Logger:
         if False == Logger.logToStdOut and None != self.logFh:
             close(self.logFh)
 
-    ## Logging debug message
+    ## Log debug message
     #  @param msg - Log message
     def debug(self, msg):
         self.__logMsg(msg, Logger.Level.Debug)
 
-    ## Logging informational message
+    ## Log informational message
     #  @param msg - Log message
     def info(self, msg):
         self.__logMsg(msg, Logger.Level.Info)
 
-    ## Logging warning message
+    ## Log warning message
     #  @param msg - Log message
     def warn(self, msg):
         self.__logMsg(msg, Logger.Level.Warn)
 
-    ## Logging error message
+    ## Log error message
     #  @param msg - Log message
     def error(self, msg):
         self.__logMsg(msg, Logger.Level.Error)
@@ -104,8 +104,6 @@ class Logger:
         frameinfo = getframeinfo(currentframe().f_back.f_back)
 
         if level < Logger.logLevel:
-            print Logger.Level.toStr(level)
-            print Logger.Level.toStr(Logger.logLevel)
             return
 
         if None != self.logPrefix:
