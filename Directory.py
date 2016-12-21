@@ -10,6 +10,45 @@ except ImportError:
 from time import strftime, localtime
 import ntpath
 import hashlib
+from enum import IntEnum
+import pprint
+
+class Fingerprint:
+    def __init__(self, file, md5, mtime, size):
+        self.file = file
+        self.md5 = md5
+        self.mtime = mtime
+        self.size = size
+
+    def __str__(self):
+        return "<Fingerprint file: {}, md5: {}, mtime: {}, size: {}>".format(self.file, self.md5, self.mtime, self.size)
+
+class File:
+    def __init__(self, dirEntry, fingerPrint=None):
+        assert dirEntry.is_file()
+
+        self.fileName = dirEntry.name
+        self.dirEntry = dirEntry
+        self.fingerPrint = fingerPrint
+        assert None == fingerPrint or self.fingerPrint.file == self.dirEntry.name
+
+    def setFingerprint(self, fp):
+        self.fingerPrint = fp
+
+    def needsRefingerprint(self):
+        return None == self.fingerPrint or self.dirEntry.stat().st_size != self.fingerPrint.size or self.fingerPrint.mtime < self.dirEntry.stat().st_mtime
+
+    def reFingerprint(self, force=False):
+        if not force and not self.needsRefingerprint():
+            return
+
+        self.fingerPrint = Fingerprint(self.dirEntry.name, hashlib.md5(self.dirEntry.path).hexdigest(), self.dirEntry.stat().st_mtime, self.dirEntry.stat().st_size)
+
+    def __repr__(self):
+        return self.__str__()
+
+    def __str__(self):
+        return "file: {}, dirEntry: {}, fp: {}".format(self.fileName, self.dirEntry, self.fingerPrint)
 
 class Directory:
     def __init__(self, path):
@@ -23,7 +62,9 @@ class Directory:
         self.fpDBMTime = self.__getfpDBMTime()
         self.subDirs = []
         self.files = dict()
-        self.lsDir()
+        self.deletedFiles = []
+        self.__lsDir()
+        self.__readFpDB();
 
     def __getfpDBMTime(self):
         if not os.path.isfile(self.fpDBFile):
@@ -34,45 +75,104 @@ class Directory:
     def __getMTimeForFile(self, file):
         return os.stat(os.path.join(self.path, file)).st_mtime
 
-    ## This function creates Directory object for each subdirectory and caches the modify times for all files
-    def lsDir(self):
+    ## This function creates Directory object for each subdirectory and caches the modify times for
+    #  all files
+    def __lsDir(self):
         headerPrinted = False
 
         for element in scandir(self.path):
             if element.name == ".dp":
                 continue
             if element.is_dir():
-                p = os.path.join(self.path, element.name)
                 if not headerPrinted:
-                    self.logger.debug("list of sub directories for {}:".format(self.path))
                     headerPrinted = True 
 
-                self.logger.debug(p)
-                self.subDirs.append(Directory(p))
+                self.subDirs.append(Directory(element.path))
             elif element.is_file():
-                self.files[element.name] = element.stat().st_mtime
+                self.files[element.name] = File(element)
+
+    def __readFpDB(self):
+        if not os.path.isfile(self.fpDBFile):
+            return
+
+        fh = open(self.fpDBFile, 'r')
+        for line in fh:
+            line = line.rstrip()
+            if not line:
+                continue
+            vals = line.split(',')
+            fp = Fingerprint(vals[0], vals[1], float(vals[2]), long(vals[3]))
+
+            # handle file deletes
+            if not vals[0] in self.files:
+                self.deletedFiles.append(vals[0])
+            else:
+                self.files[vals[0]].setFingerprint(fp)
+
+    def __createPrivateDirectory(self):
+        privDir = os.path.join(self.path, ".dp")
+        if os.path.isdir(privDir):
+            return
+        else:
+            assert os.path.isdir(self.path)
+            os.makedirs(privDir)
+
+    def __flushFpDB(self):
+        self.__createPrivateDirectory()
+
+        fh = open(self.fpDBFile, "w")
+        for f, info in self.files.iteritems():
+            assert not info.needsRefingerprint()
+            fp = info.fingerPrint
+            fh.write("{},{},{},{}\n".format(fp.file, fp.md5, fp.mtime, fp.size))
+
+        fh.close()
+
+        # also create deletedFiles variable
+        self.deletedFiles = []
+
+    def fingerPrintNeeded(self):
+        self.logger.debug("checking {} if fingerpring is needed...".format(self.path))
+        if not os.path.isfile(self.fpDBFile):
+            self.logger.debug("fpDBFile does not exist; finger print needed")
+            return True
+
+        # check if there are files that are deleted
+        if self.deletedFiles:
+            self.logger.debug("files has been deleted ({}); fingerprint needed".format(','.join(self.deletedFiles)))
+            return True
+
+        # check if sub directories need to be fingerPrinted
+        for d in self.subDirs:
+            if d.fingerPrintNeeded():
+                self.logger.debug("sud dir {} need to be fingerprinted, so fingerprint needed".format(d.path))
+                return True
+
+        # check if files have changed or have been modified
+        for f, info in self.files.iteritems():
+            if info.needsRefingerprint():
+                self.logger.debug("{} needs to be fingerprinted, so fingerprint needed".format(f))
+                return True
+
+        # no changes detected
+        self.logger.debug("{} does not have to fingerprinted".format(self.path))
+        return False
 
     def fingerPrint(self):
         self.logger.debug("fingerprinting {}...".format(self.path))
 
-        # figure out if all the files need to be fingerprinted
-        fpAllFiles = False
-        if not os.path.isfile(self.fpDBFile):
-            fpAllFiles = True
+        # figure if fingerprinting is needed
+        #if not self.fingerPrintNeeded():
+        #    self.logger.info("no need to fingerprint '{}'".format(self.path))
 
         # finger print sub directories first
         [subdir.fingerPrint() for subdir in self.subDirs]
 
-        # list files that need to be finger printed
-        files = []
-        for file, mTime in self.files.iteritems():
-            if fpAllFiles or mTime > self.fpDBMTime:
-                files.append(file)
+        # fingerprint files
+        for f, info in self.files.iteritems():
+            if info.needsRefingerprint():
+                self.logger.debug("fingerprinting {}...".format(f))
+                info.reFingerprint()
 
-        if not files:
-            self.logger.info("no files to fingerprint in '{}'".format(self.path))
-        else:
-            self.logger.info("files that need to be fingerprinted in '{}': {}".format(self.path, ', '.join(files)))
-
-        [self.logger.debug(hashlib.md5(os.path.join(self.path, file)).hexdigest()) for file in files]
-        # TODO - need to handle deleted files
+        # flush to DB
+        self.__flushFpDB()
