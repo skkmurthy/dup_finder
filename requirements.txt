@@ -1,2 +1,2 @@
 enum34
-scandir==1.4
+scandir==1.4; python_version<'3.5'
