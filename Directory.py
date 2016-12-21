@@ -2,6 +2,11 @@
 
 import os.path
 import Logger
+try:
+    from os import scandir
+except ImportError:
+    from scandir import scandir
+
 from time import strftime, localtime
 import ntpath
 
@@ -41,9 +46,10 @@ class Directory:
     def initSubDirs(self, checkForModifiedFiles=False):
         self.subDirs = []
         headerPrinted = False
-        for subdir in os.listdir(self.path):
-            if subdir != ".dp" and os.path.isdir(os.path.join(self.path, subdir)):
-                p = os.path.join(self.path, subdir)
+
+        for subdir in scandir(self.path):
+            if subdir.name != ".dp" and subdir.is_dir():
+                p = os.path.join(self.path, subdir.name)
                 if not headerPrinted:
                     self.logger.debug("list of sub directories for {}:".format(self.path))
                     headerPrinted = True 
