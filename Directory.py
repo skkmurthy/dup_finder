@@ -158,21 +158,19 @@ class Directory:
         self.logger.debug("{} does not have to fingerprinted".format(self.path))
         return False
 
-    def fingerPrint(self):
+    def fingerPrint(self, dryRun=False):
         self.logger.debug("fingerprinting {}...".format(self.path))
 
-        # figure if fingerprinting is needed
-        #if not self.fingerPrintNeeded():
-        #    self.logger.info("no need to fingerprint '{}'".format(self.path))
-
         # finger print sub directories first
-        [subdir.fingerPrint() for subdir in self.subDirs]
+        [subdir.fingerPrint(dryRun) for subdir in self.subDirs]
 
         # fingerprint files
         for f, info in self.files.iteritems():
             if info.needsRefingerprint():
                 self.logger.debug("fingerprinting {}...".format(f))
-                info.reFingerprint()
+                if not dryRun:
+                    info.reFingerprint()
 
         # flush to DB
-        self.__flushFpDB()
+        if not dryRun:
+            self.__flushFpDB()

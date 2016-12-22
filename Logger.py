@@ -39,7 +39,7 @@ class Logger:
     toStdOut = False
 
     ## Loggig level
-    logLevel = Level.Debug
+    logLevel = Level.Info
 
     ## A global override method, if called, will redirect all logs to stdout
     @staticmethod
