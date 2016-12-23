@@ -201,9 +201,25 @@ class Directory:
                 or fp.size != file.dirEntry.stat().st_size\
                 or long(fp.mtime) < long(file.dirEntry.stat().st_mtime)
 
+    @staticmethod
+    def __hashFile(file):
+        BUF_SIZE = 65536
+
+        md5 = hashlib.md5()
+
+        with open(file, 'rb') as f:
+            while True:
+                data = f.read(BUF_SIZE)
+                if not data:
+                    break
+
+                md5.update(data)
+
+        return md5.hexdigest()
+
     def __fingerprintFile(self, file):
         self.fpCache.addFingerprint(file.dirEntry.name,
-                                    hashlib.md5(file.dirEntry.path).hexdigest(),\
+                                    Directory.__hashFile(file.dirEntry.path),\
                                     file.dirEntry.stat().st_mtime,\
                                     file.dirEntry.stat().st_size)
 
