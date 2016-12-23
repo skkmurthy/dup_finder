@@ -228,4 +228,13 @@ class Directory:
         self.logger.debug("checking if a file <{},{},{}> exists...".format(fp.name, fp.md5, fp.size))
 
         # check current directory first
-        fpCache.ha
+        if self.fpCache.checkFile(fp):
+            self.logger.info("found {} with digest {}...".format(fp.name, fp.md5))
+            return True
+
+        # check sub directories
+        for dir in self.subDirs:
+            if dir.checkFile(fp):
+                return True
+
+        return False
