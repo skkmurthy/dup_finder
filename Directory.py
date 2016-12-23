@@ -134,7 +134,7 @@ class FPCache:
         # check if a file with the fingerprint exists and also confirm that the size matches.
         if fp.md5 in self.fpByMd5:
             dup = self.fpByMd5[fp.md5]
-            self.logger.info("found a file with md5 {}: <file:{}, size: {}>".format(fp.md5, dup.name, dup.size))
+            self.logger.info("found a dup. remote: <{},{},{}>, local: <{},{},{}>".format(fp.file, fp.md5, fp.size, dup.file, dup.md5, dup.size))
             if fp.size != dup.size:
                 msg = "sizes don't match! remote file size: {}, local file size: {}".format(fp.size, dup.size)
                 self.logger.warn(msg)
@@ -225,11 +225,10 @@ class Directory:
             self.fpCache.flushCache()
 
     def checkFile(self, fp):
-        self.logger.debug("checking if a file <{},{},{}> exists...".format(fp.name, fp.md5, fp.size))
+        self.logger.debug("checking for file <{},{},{}> exists...".format(fp.file, fp.md5, fp.size))
 
         # check current directory first
         if self.fpCache.checkFile(fp):
-            self.logger.info("found {} with digest {}...".format(fp.name, fp.md5))
             return True
 
         # check sub directories
