@@ -21,7 +21,99 @@ class Fingerprint:
         self.size = size
 
     def __str__(self):
-        return "<Fingerprint file: {}, md5: {}, mtime: {}, size: {}>".format(self.file, self.md5, self.mtime, self.size)
+        return "<Fingerprint file: {}, md5: {}, mtime: {}, size: {}>" \
+                    .format(self.file, self.md5, self.mtime, self.size)
+
+class FPCache:
+    def __init__(self, path):
+        self.path = path
+        self.fpByFile = dict()
+        self.fpByMd5 = dict()
+        self.deletedFiles = []
+        self.__readDB()
+        self.__cacheDirty = False
+
+    def __del__(self):
+        self.__flushDB()
+
+    def __readDB(self):
+        if not os.path.isfile(self.path):
+            # there is nothing to read
+            return
+
+        fh = open(self.path, 'r')
+        for line in fh:
+            line = line.rstrip()
+            if not line:
+                continue
+            vals = line.split('|')
+
+            fp = Fingerprint(vals[0], vals[1], float(vals[2]), long(vals[3]))
+
+            self.fpByFile[vals[0]] = fp
+            self.fpByMd5[vals[1]] = fp
+
+    def __flushDB(self):
+        if not self.__cacheDirty:
+            return
+
+        fh = open(self.path, "w")
+        for f, fp in self.fpByFile:
+            if f in self.deletedFiles:
+                continue
+
+            fh.write("{}|{}|{}|{}\n".format(fp.file, fp.md5, fp.mtime, fp.size))
+
+        fh.close()
+
+        # also create deletedFiles variable
+        self.deletedFiles = []
+
+        self.__cacheDirty = False
+
+    def fpForFile(self, file):
+        if not self.fpByFile:
+            return None
+        elif file in self.fpByFile:
+            return self.fpByFile[file]
+        else:
+            return None
+
+    def addFingerprint(self, file, md5, mtime, size):
+        if file in self.fpByFile:
+            # modify FP in fpByFile and then for dpByMd5, delete entry for old md5 and add it an
+            # entry for new md5
+
+            assert self.fpByFile[file].file == file
+            # record old FP
+            oldFp = self.fpByFile[file].md5
+
+            self.fpByFile[file].md5 = md5
+            self.fpByFile[file].mtime = mtime
+            self.fpByFile[file].size = size
+
+            # add by new fingerprint
+            del self.fpByMd5[oldFp]
+            self.fpByMd5[md5] = self.fpByFile[file]
+        else:
+            # we need to create a new fingerprint and add to both dictionaries
+            fp = Fingerprint(file, md5, float(mtime), long(size))
+
+            self.fpByFile[vals[0]] = fp
+            self.fpByMd5[vals[1]] = fp
+
+        self.__cacheDirty = True
+
+    def handleDeletedFiles(self, lsFiles):
+        # for each file in the cache, check if it can be 'ls'ed
+        for f, fp in self.fpByFile:
+            if f not in lsFiles:
+                # remove from the cache and mark dirty
+                assert self.fpByMd5[fp.md5]
+                del self.fpByMd5[fp.md5]
+                del self.fpByFile[f]
+
+                self.__cacheDirty = True
 
 class File:
     def __init__(self, dirEntry, fingerPrint=None):
