@@ -137,19 +137,19 @@ class FPCache:
     def checkFile(self, fp):
         # check if a file with the fingerprint exists and also confirm that the size matches.
         if fp.md5 in self.fpByMd5:
-            dup = self.fpByMd5[fp.md5]
+            orig = self.fpByMd5[fp.md5]
             self.logger.info("found a dup. remote: <{},{},{}>, local: <{},{},{}>"\
-                             .format(fp.path, fp.md5, fp.size, dup.path, dup.md5, dup.size))
-            if fp.size != dup.size:
+                             .format(fp.path, fp.md5, fp.size, orig.path, orig.md5, orig.size))
+            if fp.size != orig.size:
                 msg = "sizes don't match! remote file size: {}, local file size: {}"\
-                        .format(fp.size, dup.size)
+                        .format(fp.size, orig.size)
                 self.logger.warn(msg)
                 raise Exception(msg)
-                return False
+                return None
 
-            return True
+            return orig
         else:
-            return False
+            return None
 
 class File:
     def __init__(self, dirEntry):
@@ -239,12 +239,20 @@ class Directory:
         self.logger.debug("checking for file <{},{},{}> exists...".format(fp.file, fp.md5, fp.size))
 
         # check current directory first
-        if self.fpCache.checkFile(fp):
-            return True
+        orig = self.fpCache.checkFile(fp)
+        if orig != None:
+            return orig
 
         # check sub directories
         for dir in self.subDirs:
-            if dir.checkFile(fp):
-                return True
+            orig = dir.checkFile(fp)
+            if None != orig:
+                return orig
 
-        return False
+        return None
+
+    def getFileList(self):
+        return self.files.keys()
+
+    def getFpForFile(self, f):
+        return self.fpCache.getFpForFile(f)
