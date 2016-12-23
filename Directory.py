@@ -121,19 +121,11 @@ class FPCache:
                 self.__cacheDirty = True
 
 class File:
-    def __init__(self, dirEntry, fpCache):
+    def __init__(self, dirEntry):
         assert dirEntry.is_file()
 
         self.fileName = dirEntry.name
         self.dirEntry = dirEntry
-        self.fpCache = fpCache
-
-    def needsRefingerprint(self):
-        fp = self.fpCache.getFpForFile(self.fileName)
-        return None == fp or fp.size != self.dirEntry.stat().st_size or long(fp.mtime) < long(self.dirEntry.stat().st_mtime)
-
-    def reFingerprint(self, force=False):
-        self.fpCache.addFingerprint(self.dirEntry.name, hashlib.md5(self.dirEntry.path).hexdigest(), self.dirEntry.stat().st_mtime, self.dirEntry.stat().st_size)
 
 class Directory:
     def __init__(self, path, checkMode=False):
@@ -159,7 +151,7 @@ class Directory:
             if element.is_dir():
                 self.subDirs.append(Directory(element.path))
             elif element.is_file():
-                self.files[element.name] = File(element, self.fpCache)
+                self.files[element.name] = File(element)
 
     def __createPrivateDirectory(self):
         privDir = os.path.join(self.path, ".dp")
@@ -168,6 +160,13 @@ class Directory:
         else:
             assert os.path.isdir(self.path)
             os.makedirs(privDir)
+
+    def __hasFileChanged(self, file):
+        fp = self.fpCache.getFpForFile(file.fileName)
+        return None == fp or fp.size != file.dirEntry.stat().st_size or long(fp.mtime) < long(file.dirEntry.stat().st_mtime)
+
+    def __fingerprintFile(self, file):
+        self.fpCache.addFingerprint(file.dirEntry.name, hashlib.md5(file.dirEntry.path).hexdigest(), file.dirEntry.stat().st_mtime, file.dirEntry.stat().st_size)
 
     def fingerPrint(self, dryRun=False):
         if self.checkMode:
@@ -180,10 +179,10 @@ class Directory:
 
         # fingerprint files
         for f, info in self.files.iteritems():
-            if info.needsRefingerprint():
+            if self.__hasFileChanged(info):
                 self.logger.debug("fingerprinting {}...".format(f))
                 if not dryRun:
-                    info.reFingerprint()
+                    self.__fingerprintFile(info)
 
         # handle file deletes
         if self.fpCache.haveDeletedFiles(self.files.keys()):
