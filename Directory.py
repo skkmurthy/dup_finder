@@ -334,6 +334,8 @@ class Directory:
 
         for f in self.files.keys():
             fp = self.fpCache.getFpForFile(f)
+            if None == fp:
+                raise Exception("directory {} needs to be fingerprinted".format(self.path))
 
             if fp.md5 not in hash:
                 hash[fp.md5] = [fp.path]
