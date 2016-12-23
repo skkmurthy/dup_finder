@@ -7,8 +7,8 @@ from Logger import Logger
 import pprint
 
 def printUsage():
-    print "Two modes: "
-    print "digest generation:   main.py --mode=digest [-v -n --no-log] <dir>"
+    print "Modes: "
+    print "fingerprint:         main.py --mode=fingerprint [-v -n --no-log] <dir>"
     print "remove dups:         main.py --mode=remove-dups [-v -n --no-log] <dir> <refDir>"
     print "check internal dups: main.py --mode=check-int-dups [-v -n --no-log] <dir>"
 
@@ -42,7 +42,7 @@ def main(argv):
     # enable debug logging till we have some confidence in the implementation
     Logger.setLogLevel(Logger.Level.Debug)
 
-    if 'digest' == mode or 'check-int-dups' == mode:
+    if 'fingerprint' == mode or 'check-int-dups' == mode:
         if len(args) != 1:
             print "specify directory to fingerprint"
             printUsage()
@@ -54,7 +54,7 @@ def main(argv):
             sys.exit(2)
 
         dir = Directory(args[0])
-        if 'digest' == mode:
+        if 'fingerprint' == mode:
             dir.fingerPrint(dryRun)
         else:
             dir.checkForInternalDups()
