@@ -15,7 +15,7 @@ import pprint
 
 class Fingerprint:
     def __init__(self, file, md5, mtime, size):
-        self.file = file.replace(',', '_')
+        self.file = file
         self.md5 = md5
         self.mtime = mtime
         self.size = size
@@ -60,18 +60,11 @@ class Directory:
         self.__createPrivateDirectory()
         self.logger = Logger.Logger(self.logFile, ntpath.basename(self.path))
         self.dirMTime = os.stat(self.path).st_mtime
-        self.fpDBMTime = self.__getfpDBMTime()
         self.subDirs = []
         self.files = dict()
         self.deletedFiles = []
         self.__lsDir()
-        self.__readFpDB();
-
-    def __getfpDBMTime(self):
-        if not os.path.isfile(self.fpDBFile):
-            return 0
-        else:
-            return os.stat(self.fpDBFile).st_mtime
+        self.__readFpDB()
 
     def __getMTimeForFile(self, file):
         return os.stat(os.path.join(self.path, file)).st_mtime
@@ -90,7 +83,7 @@ class Directory:
 
                 self.subDirs.append(Directory(element.path))
             elif element.is_file():
-                self.files[element.name.replace(',', '_')] = File(element)
+                self.files[element.name] = File(element)
 
     def __readFpDB(self):
         if not os.path.isfile(self.fpDBFile):
@@ -101,7 +94,7 @@ class Directory:
             line = line.rstrip()
             if not line:
                 continue
-            vals = line.split(',')
+            vals = line.split('|')
             fp = Fingerprint(vals[0], vals[1], float(vals[2]), long(vals[3]))
 
             # handle file deletes
@@ -125,7 +118,7 @@ class Directory:
         for f, info in self.files.iteritems():
             assert not info.needsRefingerprint()
             fp = info.fingerPrint
-            fh.write("{},{},{},{}\n".format(fp.file, fp.md5, fp.mtime, fp.size))
+            fh.write("{}|{}|{}|{}\n".format(fp.file, fp.md5, fp.mtime, fp.size))
 
         fh.close()
 
