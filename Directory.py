@@ -14,16 +14,18 @@ from enum import IntEnum
 import pprint
 
 class Fingerprint:
-    def __init__(self, file, md5, mtime, size):
+    def __init__(self, file, dir, md5, mtime, size):
         self.file = file
         self.md5 = md5
         self.mtime = mtime
         self.size = size
+        self.path = os.path.join(dir,file)
 
 class FPCache:
     def __init__(self, path, logger):
         self.path = path
         self.logger = logger
+        self.dir = os.path.dirname(os.path.dirname(path))
 
         self.fpByFile = dict()
         self.fpByMd5 = dict()
@@ -50,7 +52,7 @@ class FPCache:
                 continue
             vals = line.split('|')
 
-            fp = Fingerprint(vals[0], vals[1], float(vals[2]), long(vals[3]))
+            fp = Fingerprint(vals[0], self.dir, vals[1], float(vals[2]), long(vals[3]))
 
             self.fpByFile[vals[0]] = fp
             self.fpByMd5[vals[1]] = fp
@@ -102,7 +104,7 @@ class FPCache:
         else:
             # we need to create a new fingerprint and add to both dictionaries
             self.logger.info("adding new file {} with digest {} to cache...".format(file, md5))
-            fp = Fingerprint(file, md5, float(mtime), long(size))
+            fp = Fingerprint(file, self.dir, md5, float(mtime), long(size))
 
             self.fpByFile[file] = fp
             self.fpByMd5[md5] = fp
@@ -136,7 +138,7 @@ class FPCache:
         if fp.md5 in self.fpByMd5:
             dup = self.fpByMd5[fp.md5]
             self.logger.info("found a dup. remote: <{},{},{}>, local: <{},{},{}>"\
-                             .format(fp.file, fp.md5, fp.size, dup.file, dup.md5, dup.size))
+                             .format(fp.path, fp.md5, fp.size, dup.path, dup.md5, dup.size))
             if fp.size != dup.size:
                 msg = "sizes don't match! remote file size: {}, local file size: {}"\
                         .format(fp.size, dup.size)
@@ -159,14 +161,14 @@ class Directory:
     def __init__(self, path, checkMode=False):
         if not os.path.isdir(path):
             raise Exception(path + " does not exist or is not a directory")
-        self.path = path
+        self.path = os.path.abspath(path)
         self.checkMode = checkMode
 
-        self.logFile = os.path.join(path, ".dp", Logger.Logger.newLogFileName())
+        self.logFile = os.path.join(self.path, ".dp", Logger.Logger.newLogFileName())
         self.__createPrivateDirectory()
         self.logger = Logger.Logger(self.logFile, ntpath.basename(self.path))
 
-        self.fpDBFile = os.path.join(path, ".dp", "fpDB.txt")
+        self.fpDBFile = os.path.join(self.path, ".dp", "fpDB.txt")
         self.fpCache = FPCache(self.fpDBFile, self.logger)
 
         self.files = dict()
