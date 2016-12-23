@@ -21,11 +21,14 @@ class Fingerprint:
         self.size = size
 
 class FPCache:
-    def __init__(self, path):
+    def __init__(self, path, logger):
         self.path = path
+        self.logger = logger
+
         self.fpByFile = dict()
         self.fpByMd5 = dict()
         self.deletedFiles = []
+
         self.__readDB()
         self.__cacheDirty = False
 
@@ -33,8 +36,11 @@ class FPCache:
         self.flushCache()
 
     def __readDB(self):
+        self.logger.debug("reading fingerprint database...")
+
         if not os.path.isfile(self.path):
             # there is nothing to read
+            self.logger.warn("fingerprint database file not found")
             return
 
         fh = open(self.path, 'r')
@@ -53,6 +59,7 @@ class FPCache:
         if not self.__cacheDirty:
             return
 
+        self.logger.info("flushing fingerprints to file...")
         fh = open(self.path, "w")
         for f, fp in self.fpByFile.iteritems():
             if f in self.deletedFiles:
@@ -79,6 +86,7 @@ class FPCache:
         if file in self.fpByFile:
             # modify FP in fpByFile and then for dpByMd5, delete entry for old md5 and add it an
             # entry for new md5
+            self.logger.info("modifying {} with digest {} in cache...".format(file, md5))
 
             assert self.fpByFile[file].file == file
             # record old FP
@@ -93,6 +101,7 @@ class FPCache:
             self.fpByMd5[md5] = self.fpByFile[file]
         else:
             # we need to create a new fingerprint and add to both dictionaries
+            self.logger.info("adding new file {} with digest {} to cache...".format(file, md5))
             fp = Fingerprint(file, md5, float(mtime), long(size))
 
             self.fpByFile[file] = fp
@@ -106,7 +115,7 @@ class FPCache:
             if f not in lsFiles:
                 return True
 
-    def dirty(self):
+    def isDirty(self):
         return self.__cacheDirty
 
     def removeDeletedFiles(self, lsFiles):
@@ -114,11 +123,27 @@ class FPCache:
         for f in self.fpByFile.keys():
             if f not in lsFiles:
                 # remove from the cache and mark dirty
+                self.logger.warn("deleting file {} with digest {} from cache...".format(f, self.fpByFile[f].md5))
                 assert self.fpByMd5[self.fpByFile[f].md5]
                 del self.fpByMd5[self.fpByFile[f].md5]
                 del self.fpByFile[f]
 
                 self.__cacheDirty = True
+
+    def checkFile(self, fp):
+        # check if a file with the fingerprint exists and also confirm that the size matches.
+        if fp.md5 in self.fpByMd5:
+            dup = self.fpByMd5[fp.md5]
+            self.logger.info("found a file with md5 {}: <file:{}, size: {}>".format(fp.md5, dup.name, dup.size))
+            if fp.size != dup.size:
+                msg = "sizes don't match! remote file size: {}, local file size: {}".format(fp.size, dup.size)
+                self.logger.warn(msg)
+                raise Exception(msg)
+                return False
+
+            return True
+        else:
+            return False
 
 class File:
     def __init__(self, dirEntry):
@@ -133,11 +158,14 @@ class Directory:
             raise Exception(path + " does not exist or is not a directory")
         self.path = path
         self.checkMode = checkMode
-        self.fpDBFile = os.path.join(path, ".dp", "fpDB.txt")
-        self.fpCache = FPCache(self.fpDBFile)
+
         self.logFile = os.path.join(path, ".dp", Logger.Logger.newLogFileName())
         self.__createPrivateDirectory()
         self.logger = Logger.Logger(self.logFile, ntpath.basename(self.path))
+
+        self.fpDBFile = os.path.join(path, ".dp", "fpDB.txt")
+        self.fpCache = FPCache(self.fpDBFile, self.logger)
+
         self.files = dict()
         self.subDirs = []
         self.__lsDir()
@@ -192,6 +220,12 @@ class Directory:
 
         # flush to DB
         if dryRun:
-            assert not self.fpCache.dirty()
+            assert not self.fpCache.isDirty()
         else:
             self.fpCache.flushCache()
+
+    def checkFile(self, fp):
+        self.logger.debug("checking if a file <{},{},{}> exists...".format(fp.name, fp.md5, fp.size))
+
+        # check current directory first
+        fpCache.ha
