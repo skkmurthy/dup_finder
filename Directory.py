@@ -103,6 +103,9 @@ class FPCache:
             del self.fpByMd5[oldFp]
             self.fpByMd5[md5] = self.fpByFile[file]
         else:
+            # this assert should not fire unless there are duplicates in the same directory
+            assert md5 not in self.fpByMd5
+
             # we need to create a new fingerprint and add to both dictionaries
             self.logger.info("adding new file {} with digest {} to cache...".format(file, md5))
             fp = Fingerprint(file, self.dir, md5, float(mtime), long(size))
@@ -324,5 +327,40 @@ class Directory:
 
         # update FP DB
         self.fpCache.flushCache()
+
+    def __addFilesToHash(self, hash):
+        # pass it down to sub dirs first
+        [subdir.__addFilesToHash(hash) for subdir in self.subDirs]
+
+        for f in self.files.keys():
+            fp = self.fpCache.getFpForFile(f)
+
+            if fp.md5 not in hash:
+                hash[fp.md5] = [fp.path]
+            else:
+                hash[fp.md5].append(fp.path)
+
+    def checkForInternalDups(self):
+        # collect all the hashes by file and check for hashes that have more than one file
+        md5Hash = dict()
+        self.__addFilesToHash(md5Hash)
+
+        if not md5Hash:
+            self.logger.info("no dups")
+
+        self.logger.info("list of dups:")
+        for md5, files in md5Hash.iteritems():
+            if len(files) > 1:
+                msg = ""
+                firstDone = False
+                for f in files:
+                    if not firstDone:
+                        msg = f
+                        firstDone = True
+                    else:
+                        msg = msg + ", " + f
+
+                self.logger.info(msg)
+
 
 
