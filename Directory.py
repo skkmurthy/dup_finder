@@ -136,17 +136,18 @@ class File:
         self.fpCache.addFingerprint(self.dirEntry.name, hashlib.md5(self.dirEntry.path).hexdigest(), self.dirEntry.stat().st_mtime, self.dirEntry.stat().st_size)
 
 class Directory:
-    def __init__(self, path):
+    def __init__(self, path, checkMode=False):
         if not os.path.isdir(path):
             raise Exception(path + " does not exist or is not a directory")
         self.path = path
+        self.checkMode = checkMode
         self.fpDBFile = os.path.join(path, ".dp", "fpDB.txt")
         self.fpCache = FPCache(self.fpDBFile)
         self.logFile = os.path.join(path, ".dp", Logger.Logger.newLogFileName())
         self.__createPrivateDirectory()
         self.logger = Logger.Logger(self.logFile, ntpath.basename(self.path))
-        self.subDirs = []
         self.files = dict()
+        self.subDirs = []
         self.__lsDir()
 
     ## This function creates Directory object for each subdirectory and caches the modify times for
@@ -169,6 +170,9 @@ class Directory:
             os.makedirs(privDir)
 
     def fingerPrint(self, dryRun=False):
+        if self.checkMode:
+            raise Exception("fingerprinting is not allowed in check mode")
+
         self.logger.debug("fingerprinting {}...".format(self.path))
 
         # finger print sub directories first
