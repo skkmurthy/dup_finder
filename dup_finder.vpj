@@ -9,6 +9,7 @@
             Name="Source Files"
             Filters="*.py"
             GUID="{05B37D2D-78E4-4E21-BEBE-96B857F06C58}">
+            <F N="Comparator.py"/>
             <F N="Directory.py"/>
             <F N="Logger.py"/>
             <F N="main.py"/>
