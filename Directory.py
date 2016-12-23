@@ -112,6 +112,15 @@ class FPCache:
 
         self.__cacheDirty = True
 
+    def deleteFingerprint(self, fp):
+        assert fp.file in self.fpByFile
+        assert fp.md5 in self.fpByMd5
+
+        del self.fpByFile[fp.file]
+        del self.fpByMd5[fp.md5]
+
+        self.__cacheDirty = True
+
     def haveDeletedFiles(self, lsFiles):
         # for each file in the cache, check if it can be 'ls'ed
         for f, fp in self.fpByFile.iteritems():
@@ -159,14 +168,24 @@ class File:
         self.dirEntry = dirEntry
 
 class Directory:
+    IgnoredFiles = (\
+                    ".DS_Store",\
+                    )
+    class __DupInfo:
+        def __init__(self, file, fp, origFp):
+            self.file = file
+            self.fp = fp
+            self.origFp = origFp
+
     def __init__(self, path, checkMode=False):
         if not os.path.isdir(path):
             raise Exception(path + " does not exist or is not a directory")
         self.path = os.path.abspath(path)
         self.checkMode = checkMode
 
-        self.logFile = os.path.join(self.path, ".dp", Logger.Logger.newLogFileName())
-        self.__createPrivateDirectory()
+        self.privDir = os.path.join(self.path, ".dp")
+        Directory.__createDirectory(self.privDir)
+        self.logFile = os.path.join(self.privDir, Logger.Logger.newLogFileName())
         self.logger = Logger.Logger(self.logFile, ntpath.basename(self.path))
 
         self.fpDBFile = os.path.join(self.path, ".dp", "fpDB.txt")
@@ -184,16 +203,15 @@ class Directory:
                 continue
             if element.is_dir():
                 self.subDirs.append(Directory(element.path))
-            elif element.is_file():
+            elif element.is_file() and element.name not in Directory.IgnoredFiles:
                 self.files[element.name] = File(element)
 
-    def __createPrivateDirectory(self):
-        privDir = os.path.join(self.path, ".dp")
-        if os.path.isdir(privDir):
+    @staticmethod
+    def __createDirectory(path):
+        if os.path.isdir(path):
             return
         else:
-            assert os.path.isdir(self.path)
-            os.makedirs(privDir)
+            os.makedirs(path)
 
     def __hasFileChanged(self, file):
         fp = self.fpCache.getFpForFile(file.fileName)
@@ -252,7 +270,7 @@ class Directory:
             self.fpCache.flushCache()
 
     def checkFile(self, fp):
-        self.logger.debug("checking for file <{},{},{}> exists...".format(fp.file, fp.md5, fp.size))
+        self.logger.debug("checking for file <{},{},{}>...".format(fp.file, fp.md5, fp.size))
 
         # check current directory first
         orig = self.fpCache.checkFile(fp)
@@ -267,8 +285,42 @@ class Directory:
 
         return None
 
-    def getFileList(self):
-        return self.files.keys()
+    def removeDups(self, refDir, compareOnly=False):
+        dups = dict()
+        # make a list of dups
+        for f in self.files.keys():
+            self.logger.info("checking for {} in {}...".format(f, refDir.path))
+            fp = self.fpCache.getFpForFile(f)
+            orig = refDir.checkFile(fp)
+            if None != orig:
+                dups[f] = Directory.__DupInfo(f, fp, orig)
 
-    def getFpForFile(self, f):
-        return self.fpCache.getFpForFile(f)
+        if not dups:
+            self.logger.info("no dups found")
+            return
+        else:
+            self.logger.debug("list of dups:")
+            for f, info in dups.iteritems():
+                self.logger.debug("{} is a dup of {}".format(info.fp.path, info.origFp.path))
+
+        if compareOnly:
+            return
+
+        # remove dups
+        for f, info in dups.iteritems():
+            self.logger.info("removing {}...".format(f))
+            dupDir = os.path.join(self.privDir, "dups", f)
+            Directory.__createDirectory(dupDir)
+            # move file to dup/<filename>
+            os.rename(info.fp.path, os.path.join(dupDir, f))
+
+            # add a symlink
+            os.symlink(info.origFp.path, os.path.join(dupDir, "orig"))
+
+            # remove from fingerprint from cache
+            self.fpCache.deleteFingerprint(info.fp)
+
+        # update FP DB
+        self.fpCache.flushCache()
+
+
