@@ -19,6 +19,7 @@ class Fingerprint:
         self.md5 = md5
         self.mtime = mtime
         self.size = size
+        # this is for processing purposes only. it is not persisted in FP DB
         self.path = os.path.join(dir,file)
 
 class FPCache:
