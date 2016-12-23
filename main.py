@@ -42,6 +42,7 @@ def main(argv):
 
     dir = Directory(args[0])
     dir.fingerPrint(dryRun)
+    #dir.fingerPrintNeeded()
 
 if __name__ == "__main__":
     main(sys.argv[1:])

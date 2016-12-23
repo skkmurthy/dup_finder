@@ -15,7 +15,7 @@ import pprint
 
 class Fingerprint:
     def __init__(self, file, md5, mtime, size):
-        self.file = file
+        self.file = file.replace(',', '_')
         self.md5 = md5
         self.mtime = mtime
         self.size = size
@@ -36,7 +36,7 @@ class File:
         self.fingerPrint = fp
 
     def needsRefingerprint(self):
-        return None == self.fingerPrint or self.dirEntry.stat().st_size != self.fingerPrint.size or self.fingerPrint.mtime < self.dirEntry.stat().st_mtime
+        return None == self.fingerPrint or self.dirEntry.stat().st_size != self.fingerPrint.size or long(self.fingerPrint.mtime) < long(self.dirEntry.stat().st_mtime)
 
     def reFingerprint(self, force=False):
         if not force and not self.needsRefingerprint():
@@ -57,6 +57,7 @@ class Directory:
         self.path = path
         self.fpDBFile = os.path.join(path, ".dp", "fpDB.txt")
         self.logFile = os.path.join(path, ".dp", Logger.Logger.newLogFileName())
+        self.__createPrivateDirectory()
         self.logger = Logger.Logger(self.logFile, ntpath.basename(self.path))
         self.dirMTime = os.stat(self.path).st_mtime
         self.fpDBMTime = self.__getfpDBMTime()
@@ -89,7 +90,7 @@ class Directory:
 
                 self.subDirs.append(Directory(element.path))
             elif element.is_file():
-                self.files[element.name] = File(element)
+                self.files[element.name.replace(',', '_')] = File(element)
 
     def __readFpDB(self):
         if not os.path.isfile(self.fpDBFile):
