@@ -38,6 +38,9 @@ def main(argv):
             sys.exit(2)
 
 
+    # enable debug logging till we have some confidence in the implementation
+    Logger.setLogLevel(Logger.Level.Debug)
+
     if mode == 'digest':
         if len(args) != 1:
             print "specify directory to fingerprint"

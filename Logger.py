@@ -95,7 +95,7 @@ class Logger:
             if True == Logger.toStdOut:
                 self.logFh = sys.stdout
             else:
-                self.logFh = open(self.logFile, "a")
+                self.logFh = open(self.logFile, "a", 0)
 
         return self.logFh
 

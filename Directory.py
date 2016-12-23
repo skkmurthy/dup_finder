@@ -245,10 +245,12 @@ class Directory:
         if self.checkMode:
             raise Exception("fingerprinting is not allowed in check mode")
 
-        self.logger.debug("fingerprinting {}...".format(self.path))
+        self.logger.info("fingerprinting {}...".format(os.path.basename(self.path)))
 
         # finger print sub directories first
-        [subdir.fingerPrint(dryRun) for subdir in self.subDirs]
+        for subdir in self.subDirs:
+            self.logger.info("fingerprinting {}...".format(os.path.basename(subdir.path)))
+            subdir.fingerPrint(dryRun)
 
         # fingerprint files
         for f, info in self.files.iteritems():
