@@ -123,7 +123,8 @@ class FPCache:
         for f in self.fpByFile.keys():
             if f not in lsFiles:
                 # remove from the cache and mark dirty
-                self.logger.warn("deleting file {} with digest {} from cache...".format(f, self.fpByFile[f].md5))
+                self.logger.warn("deleting file {} with digest {} from cache..."\
+                                 .format(f, self.fpByFile[f].md5))
                 assert self.fpByMd5[self.fpByFile[f].md5]
                 del self.fpByMd5[self.fpByFile[f].md5]
                 del self.fpByFile[f]
@@ -134,9 +135,11 @@ class FPCache:
         # check if a file with the fingerprint exists and also confirm that the size matches.
         if fp.md5 in self.fpByMd5:
             dup = self.fpByMd5[fp.md5]
-            self.logger.info("found a dup. remote: <{},{},{}>, local: <{},{},{}>".format(fp.file, fp.md5, fp.size, dup.file, dup.md5, dup.size))
+            self.logger.info("found a dup. remote: <{},{},{}>, local: <{},{},{}>"\
+                             .format(fp.file, fp.md5, fp.size, dup.file, dup.md5, dup.size))
             if fp.size != dup.size:
-                msg = "sizes don't match! remote file size: {}, local file size: {}".format(fp.size, dup.size)
+                msg = "sizes don't match! remote file size: {}, local file size: {}"\
+                        .format(fp.size, dup.size)
                 self.logger.warn(msg)
                 raise Exception(msg)
                 return False
@@ -191,10 +194,15 @@ class Directory:
 
     def __hasFileChanged(self, file):
         fp = self.fpCache.getFpForFile(file.fileName)
-        return None == fp or fp.size != file.dirEntry.stat().st_size or long(fp.mtime) < long(file.dirEntry.stat().st_mtime)
+        return None == fp\
+                or fp.size != file.dirEntry.stat().st_size\
+                or long(fp.mtime) < long(file.dirEntry.stat().st_mtime)
 
     def __fingerprintFile(self, file):
-        self.fpCache.addFingerprint(file.dirEntry.name, hashlib.md5(file.dirEntry.path).hexdigest(), file.dirEntry.stat().st_mtime, file.dirEntry.stat().st_size)
+        self.fpCache.addFingerprint(file.dirEntry.name,
+                                    hashlib.md5(file.dirEntry.path).hexdigest(),\
+                                    file.dirEntry.stat().st_mtime,\
+                                    file.dirEntry.stat().st_size)
 
     def fingerPrint(self, dryRun=False):
         if self.checkMode:
