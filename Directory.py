@@ -104,7 +104,9 @@ class FPCache:
             self.fpByMd5[md5] = self.fpByFile[file]
         else:
             # this assert should not fire unless there are duplicates in the same directory
-            assert md5 not in self.fpByMd5
+            if  md5 in self.fpByMd5:
+                print file + " is same as " + self.fpByMd5[md5].file + " in " + self.dir
+                assert 0
 
             # we need to create a new fingerprint and add to both dictionaries
             self.logger.info("adding new file {} with digest {} to cache...".format(file, md5))
@@ -173,6 +175,7 @@ class File:
 class Directory:
     IgnoredFiles = (\
                     ".DS_Store",\
+                    "._.DS_Store",\
                     )
     class __DupInfo:
         def __init__(self, file, fp, origFp):
@@ -274,6 +277,8 @@ class Directory:
         else:
             self.fpCache.flushCache()
 
+        self.logger.info("fingerprinting done")
+
     def checkFile(self, fp):
         self.logger.debug("checking for file <{},{},{}>...".format(fp.file, fp.md5, fp.size))
 
@@ -291,7 +296,12 @@ class Directory:
         return None
 
     def removeDups(self, refDir, compareOnly=False):
+        self.logger.info("removing dups with ref dir {}...".format(refDir.path))
         dups = dict()
+
+        # remove dups from sub directories
+        [subDir.removeDups(refDir, compareOnly) for subDir in self.subDirs]
+
         # make a list of dups
         for f in self.files.keys():
             self.logger.info("checking for {} in {}...".format(f, refDir.path))
@@ -309,6 +319,7 @@ class Directory:
                 self.logger.debug("{} is a dup of {}".format(info.fp.path, info.origFp.path))
 
         if compareOnly:
+            self.logger.info("remove dups done")
             return
 
         # remove dups
@@ -328,6 +339,8 @@ class Directory:
         # update FP DB
         self.fpCache.flushCache()
 
+        self.logger.info("remove dups done")
+
     def __addFilesToHash(self, hash):
         # pass it down to sub dirs first
         [subdir.__addFilesToHash(hash) for subdir in self.subDirs]
@@ -343,12 +356,10 @@ class Directory:
                 hash[fp.md5].append(fp.path)
 
     def checkForInternalDups(self):
+        self.logger.info("checking for internal dups...")
         # collect all the hashes by file and check for hashes that have more than one file
         md5Hash = dict()
         self.__addFilesToHash(md5Hash)
-
-        if not md5Hash:
-            self.logger.info("no dups")
 
         self.logger.info("list of dups:")
         for md5, files in md5Hash.iteritems():
@@ -363,6 +374,8 @@ class Directory:
                         msg = msg + ", " + f
 
                 self.logger.info(msg)
+
+        self.logger.info("internal dup check done")
 
 
 
