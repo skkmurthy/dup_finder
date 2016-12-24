@@ -7,6 +7,7 @@ Use this to remove duplicates when adding to backup. Here's a set of steps you w
   1. generate report: ```main.py --mode=check-int-dups <dir-to-backup>```
   1. the log file for the run has any duplicates that are detectef: ```cat <dir-to-backup>/.dp/<most-recent-log-file>```
   1. manually remove duplicates. Removing internal duplicates has not been implemented yet.
+  1. fingerprint "dir-to-backup" again to make sure the fingerprints for deleted files is removed: ```main.py --mode=fingerprint <dir-to-backup>```
   1. rerun the whole step to make sure that you have removed all the internal duplicates
 1. Compare against backup directory and remove duplicates from dir-to-backup: 
   1. first detect duplicates: ```main.py --mode=remove-dups <dir-to-backup> <backup-dir>```
