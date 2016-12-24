@@ -16,7 +16,9 @@
         <Folder
             Name="Other Files"
             Filters=""
-            GUID="{6FFC71F7-6D2E-4F53-B42E-2B7AA6E6ED64}"/>
+            GUID="{6FFC71F7-6D2E-4F53-B42E-2B7AA6E6ED64}">
+            <F N="README.md"/>
+        </Folder>
     </Files>
     <Config
         Name="Debug"
