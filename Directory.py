@@ -115,7 +115,7 @@ class FPCache:
             # the same directory
             if  md5 in self.fpByMd5:
                 self.logger.warn("{} is same as {} in {}"\
-                    .format(file, self.fpByMd5[md5].file,self.dir)
+                    .format(file, self.fpByMd5[md5].file,self.dir))
 
             # we need to create a new fingerprint and add to dictionaries
             self.logger.info("adding file {} with digest {} to cache..."\
