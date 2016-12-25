@@ -53,7 +53,11 @@ class FPCache:
                 continue
             vals = line.split('|')
 
-            fp = Fingerprint(vals[0], self.dir, vals[1], float(vals[2]), long(vals[3]))
+            fp = Fingerprint(vals[0],\
+                             self.dir,\
+                             vals[1],\
+                             float(vals[2]),\
+                             long(vals[3]))
 
             self.fpByFile[vals[0]] = fp
             self.fpByMd5[vals[1]] = fp
@@ -68,7 +72,8 @@ class FPCache:
             if f in self.deletedFiles:
                 continue
 
-            fh.write("{}|{}|{}|{}\n".format(fp.file, fp.md5, fp.mtime, fp.size))
+            fh.write("{}|{}|{}|{}\n"\
+                     .format(fp.file, fp.md5, fp.mtime, fp.size))
 
         fh.close()
 
@@ -87,9 +92,11 @@ class FPCache:
 
     def addFingerprint(self, file, md5, mtime, size):
         if file in self.fpByFile:
-            # modify FP in fpByFile and then for dpByMd5, delete entry for old md5 and add it an
+            # modify FP in fpByFile and then for dpByMd5, delete entry 
+            # for old md5 and add it an
             # entry for new md5
-            self.logger.info("modifying {} with digest {} in cache...".format(file, md5))
+            self.logger.info("modifying {} with digest {} in cache..."\
+                             .format(file, md5))
 
             assert self.fpByFile[file].file == file
             # record old FP
@@ -103,13 +110,16 @@ class FPCache:
             del self.fpByMd5[oldFp]
             self.fpByMd5[md5] = self.fpByFile[file]
         else:
-            # this assert should not fire unless there are duplicates in the same directory
-            if  md5 in self.fpByMd5:
-                print file + " is same as " + self.fpByMd5[md5].file + " in " + self.dir
-                assert 0
 
-            # we need to create a new fingerprint and add to both dictionaries
-            self.logger.info("adding new file {} with digest {} to cache...".format(file, md5))
+            # this assert should not fire unless there are duplicates in 
+            # the same directory
+            if  md5 in self.fpByMd5:
+                self.logger.warn("{} is same as {} in {}"\
+                    .format(file, self.fpByMd5[md5].file,self.dir)
+
+            # we need to create a new fingerprint and add to dictionaries
+            self.logger.info("adding file {} with digest {} to cache..."\
+                .format(file, md5))
             fp = Fingerprint(file, self.dir, md5, float(mtime), long(size))
 
             self.fpByFile[file] = fp
@@ -140,7 +150,7 @@ class FPCache:
         for f in self.fpByFile.keys():
             if f not in lsFiles:
                 # remove from the cache and mark dirty
-                self.logger.warn("deleting file {} with digest {} from cache..."\
+                self.logger.warn("deleting {} with digest {} from cache..."\
                                  .format(f, self.fpByFile[f].md5))
                 assert self.fpByMd5[self.fpByFile[f].md5]
                 del self.fpByMd5[self.fpByFile[f].md5]
@@ -149,11 +159,13 @@ class FPCache:
                 self.__cacheDirty = True
 
     def checkFile(self, fp):
-        # check if a file with the fingerprint exists and also confirm that the size matches.
+        # check if a file with the fingerprint exists and also confirm 
+        # that the size matches.
         if fp.md5 in self.fpByMd5:
             orig = self.fpByMd5[fp.md5]
-            self.logger.info("found a dup. remote: <{},{},{}>, local: <{},{},{}>"\
-                             .format(fp.path, fp.md5, fp.size, orig.path, orig.md5, orig.size))
+            self.logger.info(
+                "found a dup. remote: <{},{},{}>, local: <{},{},{}>"\
+                .format(fp.path, fp.md5, fp.size, orig.path, orig.md5, orig.size))
             if fp.size != orig.size:
                 msg = "sizes don't match! remote file size: {}, local file size: {}"\
                         .format(fp.size, orig.size)
