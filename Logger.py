@@ -6,6 +6,8 @@ import datetime
 from time import gmtime, strftime, localtime
 from inspect import currentframe, getframeinfo
 import ntpath
+import os
+import errno
 
 ## Logging infrastructure
 #  - Two modes:
@@ -96,6 +98,15 @@ class Logger:
                 self.logFh = sys.stdout
             else:
                 self.logFh = open(self.logFile, "a", 0)
+                # update symlink
+                logDir = os.path.dirname(os.path.abspath(self.logFile))
+                latest = os.path.join(logDir, "latest")
+                try:
+                    os.symlink(self.logFile, latest)
+                except OSError, e:
+                    if e.errno == errno.EEXIST:
+                        os.remove(latest)
+                        os.symlink(self.logFile, latest)
 
         return self.logFh
 
