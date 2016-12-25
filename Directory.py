@@ -202,11 +202,12 @@ class Directory:
         self.checkMode = checkMode
 
         self.privDir = os.path.join(self.path, ".dp")
-        Directory.__createDirectory(self.privDir)
-        self.logFile = os.path.join(self.privDir, Logger.Logger.newLogFileName())
+        self.logDir = os.path.join(self.privDir, "logs")
+        Directory.__createDirectory(self.logDir)
+        self.logFile = os.path.join(self.logDir, Logger.Logger.newLogFileName())
         self.logger = Logger.Logger(self.logFile, ntpath.basename(self.path))
 
-        self.fpDBFile = os.path.join(self.path, ".dp", "fpDB.txt")
+        self.fpDBFile = os.path.join(self.privDir, "fpDB.txt")
         self.fpCache = FPCache(self.fpDBFile, self.logger)
 
         self.files = dict()
