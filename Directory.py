@@ -505,6 +505,7 @@ class Directory:
     #                  check if they are uinque.
     #  @param dst    - Directory object for destination directory. 
     def copyUniques(self, refDir, dst):
+        self.logger.info("copying unique files to {} with reference dir {}".format(dst.path, refDir.path))
         # move uniques from sub dirs first
         for subDir in self.subDirs:
             p = os.path.join(dst.path, subDir.dirName)
@@ -523,3 +524,4 @@ class Directory:
             else:
                 self.logger.info("{} is a dup of {}".format(f, orig.path))
 
+        self.logger.info("copying unique files done")
