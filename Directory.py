@@ -129,10 +129,11 @@ class FPCache:
 
     def deleteFingerprint(self, fp):
         assert fp.file in self.fpByFile
-        assert fp.md5 in self.fpByMd5
+        #assert fp.md5 in self.fpByMd5
 
         del self.fpByFile[fp.file]
-        del self.fpByMd5[fp.md5]
+        if fp.md5 in self.fpByMd5:
+            del self.fpByMd5[fp.md5]
 
         self.__cacheDirty = True
 
@@ -152,8 +153,9 @@ class FPCache:
                 # remove from the cache and mark dirty
                 self.logger.warn("deleting {} with digest {} from cache..."\
                                  .format(f, self.fpByFile[f].md5))
-                assert self.fpByMd5[self.fpByFile[f].md5]
-                del self.fpByMd5[self.fpByFile[f].md5]
+                # assert self.fpByMd5[self.fpByFile[f].md5]
+                if self.fpByFile[f].md5 in self.fpByMd5:
+                    del self.fpByMd5[self.fpByFile[f].md5]
                 del self.fpByFile[f]
 
                 self.__cacheDirty = True
@@ -189,19 +191,82 @@ class Directory:
                     ".DS_Store",\
                     "._.DS_Store",\
                     )
+
     class __DupInfo:
         def __init__(self, file, fp, origFp):
             self.file = file
             self.fp = fp
             self.origFp = origFp
 
+    @staticmethod
+    def __getScriptDir():
+        scriptDir = os.path.dirname(os.path.realpath(__file__))
+        if scriptDir == None or not os.path.isdir(scriptDir):
+            raise Exception("unable to figure out script directory")
+        return scriptDir
+
+    __rdOnlyDirs = []
+    __rdOnlyDirsCheckDone = False
+    @staticmethod
+    def __getRdOnlyDirsList():
+        if Directory.__rdOnlyDirsCheckDone:
+            return __rdOnlyDirs
+
+        Directory.rdOlyDirs = True
+
+        f = os.path.join(Directory.__getScriptDir(), "rd_only_dirs")
+        if not os.path.isfile(f):
+            # no read only dirs have been defined
+            return Directory.__rdOnlyDirs
+
+        fh = open(f, "r")
+        for l in fh:
+            l = l.rstrip()
+            if not l:
+                continue
+            Directory.__rdOnlyDirs.append(l)
+
+        return Directory.__rdOnlyDirs
+
+    # This function returns path to dpWorkDir if the directory provided is in a
+    # read only directory
+    @staticmethod
+    def __getAltWorkDir(dir):
+        path = os.path.abspath(dir)
+
+        # check if the directory is in read only directory and get the path to the
+        # parent
+        rdDirs = Directory.__getRdOnlyDirsList()
+        rdParent = None
+        for d in rdDirs:
+            if d in path:
+                rdParent = d
+                break
+
+            # return None if the directory is not in a read-only parent
+        if rdParent == None:
+           return None
+
+        # replace rdParent with path to the dpWorkDir
+        dpWorkDir = os.path.join(Directory.__getScriptDir(), 'dp_work_dir')
+        path = path.replace(rdParent, dpWorkDir)
+        return path
+ 
+
+
     def __init__(self, path, checkMode=False):
         if not os.path.isdir(path):
             raise Exception(path + " does not exist or is not a directory")
+
         self.path = os.path.abspath(path)
+        self.dpWorkDir = Directory.__getAltWorkDir(self.path)
+        if None == self.dpWorkDir:
+            self.dpWorkDir = self.path
+        print "using {} as work dir...".format(self.dpWorkDir)
+
         self.checkMode = checkMode
 
-        self.privDir = os.path.join(self.path, ".dp")
+        self.privDir = os.path.join(self.dpWorkDir, ".dp")
         self.logDir = os.path.join(self.privDir, "logs")
         Directory.__createDirectory(self.logDir)
         self.logFile = os.path.join(self.logDir, Logger.Logger.newLogFileName())
