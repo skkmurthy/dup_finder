@@ -192,6 +192,11 @@ class Directory:
                     "._.DS_Store",\
                     )
 
+    IgnoredDirs = (\
+                   "/media/divya/win_vol/Users/manaswini/Desktop/Desktop/Ubuntu Backup",\
+                   "/media/divya/win_vol/Users/manaswini/Desktop/Desktop/Toshiba",\
+                   )
+
     class __DupInfo:
         def __init__(self, file, fp, origFp):
             self.file = file
@@ -286,6 +291,10 @@ class Directory:
             if element.name == ".dp":
                 continue
             if element.is_dir():
+                if element.path in Directory.IgnoredDirs:
+                    self.logger.warn("ignoring {}...".format(element.path))
+                    continue
+
                 self.subDirs.append(Directory(element.path))
             elif element.is_file() and element.name not in Directory.IgnoredFiles:
                 self.files[element.name] = File(element)
