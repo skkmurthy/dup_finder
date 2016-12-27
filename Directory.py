@@ -12,6 +12,8 @@ import ntpath
 import hashlib
 from enum import IntEnum
 import pprint
+from shutil import copyfile
+import time
 
 class Fingerprint:
     def __init__(self, file, dir, md5, mtime, size):
@@ -129,9 +131,12 @@ class FPCache:
 
     def deleteFingerprint(self, fp):
         assert fp.file in self.fpByFile
-        #assert fp.md5 in self.fpByMd5
+        # TD01: This assert is hit if there are duplicates in the same directory
+        # assert fp.md5 in self.fpByMd5
 
         del self.fpByFile[fp.file]
+        # TD01: The if condition is needed to handle the case when there are duplicates
+        # in the same directory
         if fp.md5 in self.fpByMd5:
             del self.fpByMd5[fp.md5]
 
@@ -179,7 +184,7 @@ class FPCache:
         else:
             return None
 
-class File:
+class FileStat:
     def __init__(self, dirEntry):
         assert dirEntry.is_file()
 
@@ -187,6 +192,9 @@ class File:
         self.dirEntry = dirEntry
 
 class Directory:
+    def __repr__(self):
+        return "Directory"
+
     IgnoredFiles = (\
                     ".DS_Store",\
                     "._.DS_Store",\
@@ -248,7 +256,7 @@ class Directory:
                 rdParent = d
                 break
 
-            # return None if the directory is not in a read-only parent
+        # return None if the directory is not in a read-only parent
         if rdParent == None:
            return None
 
@@ -267,20 +275,22 @@ class Directory:
         self.dpWorkDir = Directory.__getAltWorkDir(self.path)
         if None == self.dpWorkDir:
             self.dpWorkDir = self.path
-        print "using {} as work dir...".format(self.dpWorkDir)
+	else:
+            print "using {} as work dir...".format(self.dpWorkDir)
 
         self.checkMode = checkMode
+        self.dirName = ntpath.basename(self.path)
 
         self.privDir = os.path.join(self.dpWorkDir, ".dp")
         self.logDir = os.path.join(self.privDir, "logs")
         Directory.__createDirectory(self.logDir)
         self.logFile = os.path.join(self.logDir, Logger.Logger.newLogFileName())
-        self.logger = Logger.Logger(self.logFile, ntpath.basename(self.path))
+        self.logger = Logger.Logger(self.logFile, self.dirName)
 
         self.fpDBFile = os.path.join(self.privDir, "fpDB.txt")
         self.fpCache = FPCache(self.fpDBFile, self.logger)
 
-        self.files = dict()
+        self.fstatByName = dict()
         self.subDirs = []
         self.__lsDir()
 
@@ -297,7 +307,7 @@ class Directory:
 
                 self.subDirs.append(Directory(element.path))
             elif element.is_file() and element.name not in Directory.IgnoredFiles:
-                self.files[element.name] = File(element)
+                self.fstatByName[element.name] = FileStat(element)
 
     @staticmethod
     def __createDirectory(path):
@@ -308,6 +318,18 @@ class Directory:
 
     def __hasFileChanged(self, file):
         fp = self.fpCache.getFpForFile(file.fileName)
+#       if None == fp:
+#           self.logger.debug("HFC {}: no fingerprint, fingerprinting needed".format(file.fileName))
+#           return True
+#
+#       if fp.size != file.dirEntry.stat().st_size:
+#           self.logger.debug("HFC {}: size changed (old:{}, new {}), fingerprinting needed".format(file.fileName, fp.size, file.dirEntry.stat().st_size))
+#           return True
+#
+#       if long(fp.mtime) < long(file.dirEntry.stat().st_mtime):
+#           self.logger.debug("HFC {}: file modified (old:{}, new {}), fingerprinting needed".format(file.fileName, long(fp.mtime), long(file.dirEntry.stat().st_mtime)))
+#           return True
+
         return None == fp\
                 or fp.size != file.dirEntry.stat().st_size\
                 or long(fp.mtime) < long(file.dirEntry.stat().st_mtime)
@@ -346,17 +368,17 @@ class Directory:
             subdir.fingerPrint(dryRun)
 
         # fingerprint files
-        for f, info in self.files.iteritems():
+        for f, info in self.fstatByName.iteritems():
             if self.__hasFileChanged(info):
                 self.logger.debug("fingerprinting {}...".format(f))
                 if not dryRun:
                     self.__fingerprintFile(info)
 
         # handle file deletes
-        if self.fpCache.haveDeletedFiles(self.files.keys()):
+        if self.fpCache.haveDeletedFiles(self.fstatByName.keys()):
             self.logger.debug("removing fingerprint for deletes files...")
             if not dryRun :
-                self.fpCache.removeDeletedFiles(self.files.keys())
+                self.fpCache.removeDeletedFiles(self.fstatByName.keys())
 
         # flush to DB
         if dryRun:
@@ -390,7 +412,7 @@ class Directory:
         [subDir.removeDups(refDir, compareOnly) for subDir in self.subDirs]
 
         # make a list of dups
-        for f in self.files.keys():
+        for f in self.fstatByName.keys():
             self.logger.info("checking for {} in {}...".format(f, refDir.path))
             fp = self.fpCache.getFpForFile(f)
             orig = refDir.checkFile(fp)
@@ -432,7 +454,7 @@ class Directory:
         # pass it down to sub dirs first
         [subdir.__addFilesToHash(hash) for subdir in self.subDirs]
 
-        for f in self.files.keys():
+        for f in self.fstatByName.keys():
             fp = self.fpCache.getFpForFile(f)
             if None == fp:
                 raise Exception("directory {} needs to be fingerprinted".format(self.path))
@@ -464,5 +486,40 @@ class Directory:
 
         self.logger.info("internal dup check done")
 
+    ## This function copies over the srcFile to current directory and then adds
+    #  the fingerprint to cache
+    #  @param srcFile - Fully qualified path to the source file.
+    #  @param srcFileFP - Source file fingerprint
+    def __copyFile(self, srcFile, srcFileFP):
+        # move the file on disk
+        copyfile(srcFile, os.path.join(self.path, os.path.basename(srcFile)))
 
+        # add FP to cache
+        self.fpCache.addFingerprint(srcFileFP.file, srcFileFP.md5, time.time(), srcFileFP.size)
+
+    ## This function compares files in the current directory against the
+    #  the reference directory and then copies unique files over to the specified
+    #  destination folder.
+    #  @param refDir - Directory object for reference directory. All files in
+    #                  the current directory will be checked against refDir to
+    #                  check if they are uinque.
+    #  @param dst    - Directory object for destination directory. 
+    def copyUniques(self, refDir, dst):
+        # move uniques from sub dirs first
+        for subDir in self.subDirs:
+            p = os.path.join(dst.path, subDir.dirName)
+            if not os.path.isdir(p):
+                Directory.__createDirectory(p)
+            d = Directory(p)
+            subDir.copyUniques(refDir, d)
+
+        # copy unique files
+        for f in self.fstatByName.keys():
+            fp = self.fpCache.getFpForFile(f)
+            orig = refDir.checkFile(fp)
+            if None == orig:
+                self.logger.info("{} is unique".format(f))
+                dst.__copyFile(os.path.join(self.path, f), fp)
+            else:
+                self.logger.info("{} is a dup of {}".format(f, orig.path))
 

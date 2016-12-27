@@ -11,6 +11,7 @@ def printUsage():
     print "fingerprint:         main.py --mode=fingerprint [-v -n --no-log] <dir>"
     print "remove dups:         main.py --mode=remove-dups [-v -n --no-log] <dir> <refDir>"
     print "check internal dups: main.py --mode=check-int-dups [-v -n --no-log] <dir>"
+    print "copy unique files:   main.py --mode=copy-uniq-files [-v --no-log] <dir> <refDir> <dst>"
 
 def main(argv):
     dryRun = False
@@ -73,6 +74,27 @@ def main(argv):
         cDir = Directory(args[0])
         refDir = Directory(args[1], True)
         cDir.removeDups(refDir, dryRun)
+
+    elif mode == 'copy-uniq-files':
+        if dryRun:
+            raise Exception("dry run is not supported in this mode")
+
+        if len(args) != 3:
+            print "specify candidate, reference and destination directories"
+            printUsage()
+            sys.exit(2)
+
+        cDir = Directory(os.path.abspath(args[0]))
+        refDir = Directory(os.path.abspath(args[1]))
+        if not os.path.isdir(os.path.abspath(args[2])):
+            raise Exception("destination directory does not exist")
+
+        dPath = os.path.join(os.path.join(os.path.abspath(args[2]), cDir.dirName))
+        if not os.path.isdir(dPath):
+            os.makedirs(dPath)
+
+        dst = Directory(dPath)
+        cDir.copyUniques(refDir, dst)
 
     else:
         print "invalid mode"
