@@ -432,15 +432,17 @@ class Directory:
             return
 
         # remove dups
+        dupsDir = os.path.join(self.privDir, "dups")
+        Directory.__createDirectory(dupsDir)
+        origsDir = os.path.join(dupsDir, "origs")
+        Directory.__createDirectory(origsDir)
         for f, info in dups.iteritems():
             self.logger.info("removing {}...".format(f))
-            dupDir = os.path.join(self.privDir, "dups", f)
-            Directory.__createDirectory(dupDir)
             # move file to dup/<filename>
-            os.rename(info.fp.path, os.path.join(dupDir, f))
+            os.rename(info.fp.path, os.path.join(dupsDir, f))
 
             # add a symlink
-            os.symlink(info.origFp.path, os.path.join(dupDir, "orig"))
+            os.symlink(info.origFp.path, os.path.join(origsDir, f))
 
             # remove from fingerprint from cache
             self.fpCache.deleteFingerprint(info.fp)
