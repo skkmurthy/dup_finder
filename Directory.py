@@ -151,7 +151,7 @@ class FPCache:
     def isDirty(self):
         return self.__cacheDirty
 
-    def removeDeletedFiles(self, lsFiles):
+    def removeFPForDeletedFiles(self, lsFiles):
         # for each file in the cache, check if it can be 'ls'ed
         for f in self.fpByFile.keys():
             if f not in lsFiles:
@@ -275,7 +275,7 @@ class Directory:
         self.dpWorkDir = Directory.__getAltWorkDir(self.path)
         if None == self.dpWorkDir:
             self.dpWorkDir = self.path
-	else:
+        else:
             print "using {} as work dir...".format(self.dpWorkDir)
 
         self.checkMode = checkMode
@@ -367,7 +367,7 @@ class Directory:
         if self.fpCache.haveDeletedFiles(self.fstatByName.keys()):
             self.logger.info("removing fingerprint for deletes files...")
             if not dryRun :
-                self.fpCache.removeDeletedFiles(self.fstatByName.keys())
+                self.fpCache.removeFPForDeletedFiles(self.fstatByName.keys())
 
         # flush to DB
         if dryRun:
