@@ -201,8 +201,8 @@ class Directory:
                     )
 
     IgnoredDirs = (\
-                   "/media/divya/win_vol/Users/manaswini/Desktop/Desktop/Ubuntu Backup",\
-                   "/media/divya/win_vol/Users/manaswini/Desktop/Desktop/Toshiba",\
+                   "/media/divya/win_vol/Users/manaswini/Desktop/Desktop",\
+                   "/media/divya/win_vol/Users/manaswini/Documents/Sony",\
                    )
 
     class __DupInfo:
@@ -318,17 +318,6 @@ class Directory:
 
     def __hasFileChanged(self, file):
         fp = self.fpCache.getFpForFile(file.fileName)
-#       if None == fp:
-#           self.logger.debug("HFC {}: no fingerprint, fingerprinting needed".format(file.fileName))
-#           return True
-#
-#       if fp.size != file.dirEntry.stat().st_size:
-#           self.logger.debug("HFC {}: size changed (old:{}, new {}), fingerprinting needed".format(file.fileName, fp.size, file.dirEntry.stat().st_size))
-#           return True
-#
-#       if long(fp.mtime) < long(file.dirEntry.stat().st_mtime):
-#           self.logger.debug("HFC {}: file modified (old:{}, new {}), fingerprinting needed".format(file.fileName, long(fp.mtime), long(file.dirEntry.stat().st_mtime)))
-#           return True
 
         return None == fp\
                 or fp.size != file.dirEntry.stat().st_size\
@@ -370,13 +359,13 @@ class Directory:
         # fingerprint files
         for f, info in self.fstatByName.iteritems():
             if self.__hasFileChanged(info):
-                self.logger.debug("fingerprinting {}...".format(f))
+                self.logger.info("fingerprinting {}...".format(f))
                 if not dryRun:
                     self.__fingerprintFile(info)
 
         # handle file deletes
         if self.fpCache.haveDeletedFiles(self.fstatByName.keys()):
-            self.logger.debug("removing fingerprint for deletes files...")
+            self.logger.info("removing fingerprint for deletes files...")
             if not dryRun :
                 self.fpCache.removeDeletedFiles(self.fstatByName.keys())
 
@@ -409,7 +398,9 @@ class Directory:
         dups = dict()
 
         # remove dups from sub directories
-        [subDir.removeDups(refDir, compareOnly) for subDir in self.subDirs]
+        for subDir in self.subDirs:
+            self.logger.info("removing dups from {}...".format(subDir.dirName))
+            subDir.removeDups(refDir, compareOnly)
 
         # make a list of dups
         for f in self.fstatByName.keys():
@@ -510,6 +501,7 @@ class Directory:
         self.logger.info("copying unique files to {} with reference dir {}".format(dst.path, refDir.path))
         # move uniques from sub dirs first
         for subDir in self.subDirs:
+            self.logger.info("copying unique files from {}...".format(subDir.dirName))
             p = os.path.join(dst.path, subDir.dirName)
             if not os.path.isdir(p):
                 Directory.__createDirectory(p)

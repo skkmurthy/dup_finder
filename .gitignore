@@ -2,3 +2,4 @@
 *.vtg
 *.pyc
 .dp/
+dp_work_dir/

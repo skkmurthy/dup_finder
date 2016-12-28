@@ -41,7 +41,7 @@ def main(argv):
 
 
     # enable debug logging till we have some confidence in the implementation
-    Logger.setLogLevel(Logger.Level.Debug)
+    # Logger.setLogLevel(Logger.Level.Debug)
 
     if 'fingerprint' == mode or 'check-int-dups' == mode:
         if len(args) != 1:
