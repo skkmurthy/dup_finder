@@ -8,6 +8,10 @@ from inspect import currentframe, getframeinfo
 import ntpath
 import os
 import errno
+import pylru
+
+# allowed maximum number of open log file handles
+MAX_OPEN_LOG_FILES = 20
 
 ## Logging infrastructure
 #  - Two modes:
@@ -20,6 +24,43 @@ import errno
 #    File mode:   <Time> - [<Log Level>] - [<File>:<Line>] <message><br/>
 #    Stdout mode: <Log prefix> -- <Time> - [<Log Level>] - [<File>:<Line>] <message><br/>
 class Logger:
+    def __lruEvictionCallback(path, fh):
+        print "closing {} because the is being evicted".format(path)
+        fh.close()
+
+    # an lru cache of log file handles
+    __logFhByPath = pylru.lrucache(MAX_OPEN_LOG_FILES, __lruEvictionCallback)
+
+    @staticmethod
+    def __getLogFh(path):
+        if Logger.toStdOut:
+            return sys.stdout
+
+        print "lru size: {}".format(len(Logger.__logFhByPath))
+        print "path: {}".format(path)
+        if path in Logger.__logFhByPath:
+            return Logger.__logFhByPath[path]
+        else:
+            logFh = open(path, "a", 0)
+            Logger.__logFhByPath[path] = logFh
+            # update symlink
+            logDir = os.path.dirname(os.path.abspath(path))
+            latest = os.path.join(logDir, "latest")
+            try:
+                os.symlink(path, latest)
+            except OSError, e:
+                if e.errno == errno.EEXIST:
+                    os.remove(latest)
+                    os.symlink(path, latest)
+
+            return logFh
+
+    @staticmethod
+    def __closeLogFh(path):
+        if not Logger.toStdOut and path in Logger.__logFhByPath:
+            Logger.__logFhByPath[path].close()
+            del Logger.__logFhByPath[path]
+
     ## Logging levels
     class Level(IntEnum):
         Debug = 1
@@ -60,16 +101,15 @@ class Logger:
 
     ## Constructor
     #  @param logFilePath - fully qualified path to the log file
-    #  @param logPrefix - A prefix string that will be added to all log message in Stdout mode
+    #  @param logPrefix - A prefix string that will be added to all log message
+    #                    in Stdout mode
     def __init__(self, logFilePath, logPrefix=None):
-        self.logFile = logFilePath
+        self.logFile = os.path.abspath(logFilePath)
         self.logPrefix = logPrefix
-        self.logFh = None
 
     ## Destructor
     def __del__(self):
-        if False == Logger.logToStdOut and None != self.logFh:
-            close(self.logFh)
+        Logger.__closeLogFh(self.logFile)
 
     ## Log debug message
     #  @param msg - Log message
@@ -91,23 +131,6 @@ class Logger:
     def error(self, msg):
         self.__logMsg(msg, Logger.Level.Error)
 
-    # helper functions
-    def __getLogFh(self):
-        if None == self.logFh:
-            if True == Logger.toStdOut:
-                self.logFh = sys.stdout
-            else:
-                self.logFh = open(self.logFile, "a", 0)
-                # update symlink
-                logDir = os.path.dirname(os.path.abspath(self.logFile))
-                latest = os.path.join(logDir, "latest")
-                try:
-                    os.symlink(self.logFile, latest)
-                except OSError, e:
-                    if e.errno == errno.EEXIST:
-                        os.remove(latest)
-                        os.symlink(self.logFile, latest)
-
         return self.logFh
 
     def __logMsg(self, msg, level):
@@ -117,12 +140,13 @@ class Logger:
         # capture caller info
         frameinfo = getframeinfo(currentframe().f_back.f_back)
 
-        if None != self.logPrefix:
-            self.__getLogFh().write(self.logPrefix + " -- ")
+        fh = Logger.__getLogFh(self.logFile)
+        if None != self.logPrefix and Logger.toStdOut:
+            fh.write(self.logPrefix + " -- ")
 
-        self.__getLogFh().write("{} - [{}] - [{}:{}] {}\n".
-                                format(strftime("%Y-%m-%d %H:%M:%S", localtime()),
-                                       Logger.Level.toStr(level),
-                                       ntpath.basename(frameinfo.filename),
-                                       frameinfo.lineno, msg))
+        fh.write("{} - [{}] - [{}:{}] {}\n".
+                 format(strftime("%Y-%m-%d %H:%M:%S", localtime()),
+                        Logger.Level.toStr(level),
+                        ntpath.basename(frameinfo.filename),
+                        frameinfo.lineno, msg))
 
