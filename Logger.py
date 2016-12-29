@@ -25,7 +25,6 @@ MAX_OPEN_LOG_FILES = 20
 #    Stdout mode: <Log prefix> -- <Time> - [<Log Level>] - [<File>:<Line>] <message><br/>
 class Logger:
     def __lruEvictionCallback(path, fh):
-        print "closing {} because the is being evicted".format(path)
         fh.close()
 
     # an lru cache of log file handles
@@ -36,8 +35,6 @@ class Logger:
         if Logger.toStdOut:
             return sys.stdout
 
-        print "lru size: {}".format(len(Logger.__logFhByPath))
-        print "path: {}".format(path)
         if path in Logger.__logFhByPath:
             return Logger.__logFhByPath[path]
         else:

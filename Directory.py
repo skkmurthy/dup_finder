@@ -201,8 +201,11 @@ class Directory:
                     )
 
     IgnoredDirs = (\
-                   "/media/divya/win_vol/Users/manaswini/Desktop/Desktop",\
-                   "/media/divya/win_vol/Users/manaswini/Documents/Sony",\
+                   "/media/divya/win_vol/Users/manaswini/Desktop",\
+                   "/media/divya/win_vol/Users/manaswini/Documents",\
+                   "/media/divya/win_vol/Users/manaswini/Music",\
+                   "/media/divya/win_vol/Users/manaswini/Pictures",\
+                   "/media/divya/win_vol/Users/manaswini/Videos",\
                    )
 
     class __DupInfo:
