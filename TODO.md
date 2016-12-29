@@ -7,3 +7,8 @@
 5. Improve documentation in code.
 6. Copy over fingerprint to the dups directory.
 7. Ability to recover back dups and remove originals. (Revers the direction of duplicate removal after the remove-dups command has been executed).
+
+
+# Nice to Have
+
+1. A UI :)
